@@ -35,9 +35,10 @@ The repository is organized into the following directories and files:
 To deploy an application on COLMENA, follow these steps:
 ``` bash
 python3 -m colmena_deploy \
-	--build_path="<path_to_the_service_root>/<service_modulename>/build" 
+	--build_path="<path_to_the_service_root>/<service_modulename>/build" \
+	--platform="linux/amd64" 
 ```
-
+Multi-architecture builds (for example: --platform="linux/amd64,linux/arm64) are also supported, but a previous configuration of Docker is needed (steps to follow here: https://docs.docker.com/build/building/multi-platform/).
 ### Within a docker instance
 1. Build the image locally
 	```bash
