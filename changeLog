@@ -1,0 +1,20 @@
+Following are change highlights associated with official releases.  Important
+bug fixes are all mentioned, but some internal enhancements are omitted here for
+brevity.  Much more detail can be found in the git revision history:
+
+[unreleased] - yyyy-mm
+Added:
+Removed:
+Bugfixes:
+
+[0.1.0] - 2025-01
+Added:
+    * Publishes the service through Zenoh
+    * Adds parameter for DockerHub username
+Removed:
+    * The tool no longer contacts a DCP
+Bugfixes:
+
+[0.0.1] - 2024-11 
+First release of COLMENA's deployment tool
+

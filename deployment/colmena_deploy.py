@@ -22,8 +22,10 @@ import os
 import subprocess
 from typing import List, Dict
 
+import zenoh
 
-def build_docker_images(
+
+def build_container_images(
     path: str, tags: Dict[str, str], roles: List[str], platform: str
 ) -> Dict:
     """
@@ -31,20 +33,19 @@ def build_docker_images(
 
     Parameters:
         path: path to the build folder.
-        tags: dict with docker imageIds, the keys are the role names.
+        tags: dict with container imageIds, the keys are the role names.
         roles: list of role names.
         platform: architecture param in docker buildx.
     """
     for role_name in roles:
         role_path = f"{path}/{role_name}"
-        build_docker_image(role_path, tags[role_name], platform)
-        publish_image(tags[role_name])
+        build_container_image(role_path, tags[role_name], platform)
     return tags
 
 
-def build_docker_image(path: str, tag: str, platform: str) -> str:
+def build_container_image(path: str, tag: str, platform: str):
     """
-    Build docker image using docker buildx.
+    Build container image using docker buildx.
 
     Parameters:
         - path: path to the Dockerfile.
@@ -53,13 +54,13 @@ def build_docker_image(path: str, tag: str, platform: str) -> str:
     """
     os.environ["DOCKER_BUILDKIT"] = str(1)
     docker_build_command = (
-        f"docker buildx build --tag {tag} -f {path}/Dockerfile --rm=true "
+        f"docker buildx build --platform {platform} --tag {tag} -f {path}/Dockerfile --rm=true "
         f"--no-cache={True} --load {path}"
     )
     subprocess.check_output(docker_build_command, shell=True)  # security issue
 
 
-def publish_images(tags: Dict[str, str]):
+def publish_container_images(tags: Dict[str, str]):
     """Publishes images to DockerHub.
 
     Parameters:
@@ -80,28 +81,8 @@ def publish_image(tag: str):
     subprocess.check_output(docker_build_command, shell=True)
 
 
-def dcp_host(args) -> str:
-    """Gets DCP host from args."""
-    if args.host:
-        return args.host
-    else:
-        default = "localhost"
-        print(f"DCP host not set, defaulting to {default}")
-        return default
-
-
-def dcp_port(args) -> int:
-    """Gets DCP port from args."""
-    if args.port:
-        return args.port
-    else:
-        default = 5555
-        print(f"DCP port not set, defaulting to {str(default)}")
-        return default
-
-
-def deploy_service(_args, build_path: str, platform: str):
-    """Deploys a service by building the docker images and publishing the service.
+def deploy_service(_args, build_path: str, platform: str, user: str):
+    """Deploys a service by building the container images and publishing the service.
 
     Parameters:
         - _args: deployment arguments
@@ -117,34 +98,23 @@ def deploy_service(_args, build_path: str, platform: str):
     for role in role_definitions:
         role_name = role["id"]
         roles.append(role_name)
+        role["imageId"] = user + "/" + role["imageId"]
         tags[role_name] = role["imageId"]
-    build_docker_images(build_path, tags, roles, platform)
-    publish_service(_args, tags, service_definition)
+
+    build_container_images(build_path, tags, roles, platform)
+    publish_container_images(tags)
+    publish_service_definition(_args, service_definition)
 
 
-def publish_service(_args, tags: Dict[str, str], service_definition: str):
-    """Publishes a service by publishing images to DockerHub and the service definition to DCP.
+def publish_service_definition(_args, service_definition: str):
+    """Publish service definition to zenoh, keyexpr: colmena_service_definitions
 
-    Parameters:
-        - _args: deployment arguments
-        - tags: dict with imageIds and role_name as key
-        - service_definition: parser service definition
-    """
-    publish_images(tags)
-    dcp_host_port = dcp_host(_args) + ":" + str(dcp_port(_args))
-    result = subprocess.check_output(
-        [
-            "grpcurl",
-            "--plaintext",
-            "-d",
-            json.dumps(service_definition),
-            dcp_host_port,
-            "ColmenaPlatform/AddService",
-        ]
-    )
-    dict_result = json.loads(result)
-    print(dict_result)
-
+        Parameters:
+            - _args: deployment arguments
+            - service_definition: json service definition"""
+    print("publishing service definition to Zenoh")
+    zenoh_session = zenoh.open(zenoh.Config.from_file("zenoh_config.json5"))
+    zenoh_session.put("colmena_service_definitions", service_definition)
 
 if __name__ == "__main__":
     import argparse
@@ -155,10 +125,11 @@ if __name__ == "__main__":
         help="pretty print colmena service description",
         action="store_true",
     )
-    parser.add_argument("--build_path", help="Path to build folder")
+    parser.add_argument("--build_path", required=True, help="Path to build folder")
     parser.add_argument("--platform", help="Docker buildx architectures")
-    parser.add_argument("--host", help="DCP host for deployment")
-    parser.add_argument("--port", help="DCP port for deployment")
+    parser.add_argument("--host", help="Deployment host")
+    parser.add_argument("--port", help="Deployment port")
+    parser.add_argument("--user", required=True, help="DockerHub username")
     args = parser.parse_args()
 
-    deploy_service(args, args.build_path, args.platform)
+    deploy_service(args, args.build_path, args.platform, args.user)

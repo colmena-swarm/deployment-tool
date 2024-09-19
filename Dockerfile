@@ -14,11 +14,9 @@
 #  limitations under the License.
 #
 
-FROM fullstorydev/grpcurl:v1.9.1 AS grpcurl
+FROM python:3.14.0a2-slim-bookworm
 
-FROM python:3.9.18-slim-bookworm
-
-    ARG BUILD_DATE 2024-07-31
+    ARG BUILD_DATE 2024-12-18
 
     LABEL org.label-schema.name="Colmena's deployment tool" \
         org.label-schema.description="Tool for deploying services on a COLMENA platform" \
@@ -29,9 +27,10 @@ FROM python:3.9.18-slim-bookworm
 
     # Install Docker dependencies
     RUN apt-get update && \
-        apt-get install -y --no-install-recommends apt-transport-https=2.6.1 \
+        apt-get install -y --no-install-recommends \
+            apt-transport-https=2.6.1 \
             ca-certificates=20230311 \
-            curl=7.88.1-10+deb12u6 \
+            curl=7.88.1-10+deb12u8 \
             gnupg=2.2.40-1.1 \
             lsb-release=12.0-1 && \
         rm -rf /var/lib/apt/lists/*
@@ -43,13 +42,18 @@ FROM python:3.9.18-slim-bookworm
     # Set up the stable repository
     RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list >/dev/null
 
+    
     # Install Docker
     RUN apt-get update && \
-        apt-get install -y --no-install-recommends docker-ce=5:27.0.3-1~debian.12~bookworm \
-            docker-ce-cli=5:27.0.3-1~debian.12~bookworm && \
-        rm -rf /var/lib/apt/lists/*
+        apt-get install -y --no-install-recommends \
+            docker-ce=5:27.5.1-1~debian.12~bookworm \
+            docker-ce-cli=5:27.5.1-1~debian.12~bookworm \
+            docker-buildx-plugin=0.20.0-1~debian.12~bookworm && \
+        rm -rf /var/lib/apt/lists/* 
+    
+    COPY pyproject.toml    /colmena/pyproject.toml
 
-    COPY --from=grpcurl /bin/grpcurl /bin/grpcurl
-    COPY scripts /colmena/
+    COPY deployment /colmena/
     WORKDIR /colmena
+    RUN python3 -m pip install --no-cache-dir .
     ENTRYPOINT [ "python3", "-m", "colmena_deploy" ]

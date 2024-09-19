@@ -14,15 +14,16 @@ This GitHub repository contains all the files and software necessary to deploy a
 ## Repository Structure
 The repository is organized into the following directories and files:
 ### Directories
-- **scripts**: Scripts to deploy an application.
+- **deployment**: Script to deploy a service.
 ### Files
 - **.gitignore**: Specifies files and directories to be ignored by Git.
+- **changeLog**: Change highlights associated with official releases.
 - **CODE_OF_CONDUCT.md**: Outlines the expected behavior and guidelines for participants within the project's community. 
 - **CONTRIBUTING.md**: Overview of the repository, setup instructions, and basic usage examples.
 - **Dockerfile**: File used to create a Docker image for the deployment tool.
 - **LICENSE**: License information for the repository.
+- **pyproject.toml**: Configuration file necessary for installing the tool.
 - **README.md**: Overview of the repository, setup instructions, and basic usage examples.
-
 
 ## Getting Started
 
@@ -32,11 +33,26 @@ The repository is organized into the following directories and files:
  - Create COLMENA platform on the desired infrastructure
 
 ### Running the service
-To deploy an application on COLMENA, follow these steps:
-``` bash
-python3 -m colmena_deploy \
-	--build_path="<path_to_the_service_root>/<service_modulename>/build" 
+Install dependencies:
+```bash
+python3 -m pip install .
 ```
+
+Deploy an application on COLMENA:
+``` bash
+python3 -m deployment/colmena_deploy \
+	--build_path="<path_to_the_service_root>/<service_modulename>/build" \
+	--platform="linux/amd64" \
+	--user=${DOCKER_USERNAME}
+```
+Multi-architecture builds (for example: --platform="linux/amd64,linux/arm64) are also supported, 
+but configuration of Docker is needed (steps to follow here: https://docs.docker.com/build/building/multi-platform/).
+
+For a full list of the deployment tool parameters:
+```bash
+python3 -m deployment/colmena_deploy -h
+```
+
 
 ### Within a docker instance
 1. Build the image locally
@@ -51,7 +67,9 @@ python3 -m colmena_deploy \
 		-v <path_to_the_service_root>/<service_modulename>/build:/app \
 		--network=host \
 		colmenaswarm/deployment-tool:latest \
-		--build_path=/app
+		--build_path=/app\
+		--platform="linux/amd64" \
+		--user=${DOCKER_USERNAME}
 	```
 
 

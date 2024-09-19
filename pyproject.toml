@@ -1,0 +1,18 @@
+[project]
+name = "deployment"
+version = "0.1.0"
+authors = [
+    {name="Workflows and Distributed Computing group"},
+]
+
+description = "COLMENA service deployment tool"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+    "eclipse-zenoh==0.10.1rc0",
+]

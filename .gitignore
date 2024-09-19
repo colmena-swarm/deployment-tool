@@ -396,3 +396,12 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# JetBrains project configuration
+.idea/
+
+# python metadata
+*.egg-info/
+
+# built artifact
+build/
