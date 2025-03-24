@@ -1,0 +1,21 @@
+{
+  "id": {
+    "value": "test-service"
+  },
+  "dockerRoleDefinitions": [
+    {
+      "id": "worker",
+      "imageId": "worker-image"
+    },
+    {
+      "id": "manager", 
+      "imageId": "manager-image"
+    }
+  ],
+  "dockerContextDefinitions": [
+    {
+      "id": "shared-context",
+      "imageId": "shared-context-image"
+    }
+  ]
+}

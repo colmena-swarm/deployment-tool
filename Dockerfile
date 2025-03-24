@@ -30,12 +30,12 @@ FROM python:3.14.0a2-slim-bookworm
         apt-get install -y --no-install-recommends \
             apt-transport-https=2.6.1 \
             ca-certificates=20230311 \
-            curl=7.88.1-10+deb12u8 \
+            curl=7.88.1-10+deb12u12 \
             gnupg=2.2.40-1.1 \
             lsb-release=12.0-1 && \
         rm -rf /var/lib/apt/lists/*
 
-    # Add Docker’s official GPG key
+    # Add Docker's official GPG key
     SHELL ["/bin/bash", "-o", "pipefail", "-c"]
     RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
@@ -50,10 +50,14 @@ FROM python:3.14.0a2-slim-bookworm
             docker-ce-cli=5:27.5.1-1~debian.12~bookworm \
             docker-buildx-plugin=0.20.0-1~debian.12~bookworm && \
         rm -rf /var/lib/apt/lists/* 
-    
-    COPY pyproject.toml    /colmena/pyproject.toml
 
-    COPY deployment /colmena/
+    # Copy the entire project structure to maintain proper package layout
+    COPY . /colmena/
     WORKDIR /colmena
     RUN python3 -m pip install --no-cache-dir .
-    ENTRYPOINT [ "python3", "-m", "colmena_deploy" ]
+
+    # Add entrypoint script to initialize buildx before running
+    COPY docker-entrypoint.sh /usr/local/bin/
+    RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+    ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

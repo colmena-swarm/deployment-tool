@@ -40,7 +40,7 @@ python3 -m pip install .
 
 Deploy an application on COLMENA:
 ``` bash
-python3 -m deployment/colmena_deploy \
+python3 -m deployment.colmena_deploy \
 	--build_path="<path_to_the_service_root>/<service_modulename>/build" \
 	--platform="linux/amd64" \
 	--user=${DOCKER_USERNAME}
@@ -48,9 +48,11 @@ python3 -m deployment/colmena_deploy \
 Multi-architecture builds (for example: --platform="linux/amd64,linux/arm64) are also supported, 
 but configuration of Docker is needed (steps to follow here: https://docs.docker.com/build/building/multi-platform/).
 
+You can add the --skip_build argument if images are already in Dockerhub.
+
 For a full list of the deployment tool parameters:
 ```bash
-python3 -m deployment/colmena_deploy -h
+python3 -m deployment.colmena_deploy -h
 ```
 
 

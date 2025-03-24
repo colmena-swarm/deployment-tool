@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
-#  Copyright 2002-2024 Barcelona Supercomputing Center (www.bsc.es)
+#  Copyright 2002-2025 Barcelona Supercomputing Center (www.bsc.es)
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -19,102 +19,56 @@
 
 import json
 import os
-import subprocess
-from typing import List, Dict
+from typing import Dict, Any
 
 import zenoh
+from .build_image import Image, build_container_images
 
 
-def build_container_images(
-    path: str, tags: Dict[str, str], roles: List[str], platform: str
-) -> Dict:
-    """
-    Uploads images to DockerHub.
-
-    Parameters:
-        path: path to the build folder.
-        tags: dict with container imageIds, the keys are the role names.
-        roles: list of role names.
-        platform: architecture param in docker buildx.
-    """
-    for role_name in roles:
-        role_path = f"{path}/{role_name}"
-        build_container_image(role_path, tags[role_name], platform)
-    return tags
-
-
-def build_container_image(path: str, tag: str, platform: str):
-    """
-    Build container image using docker buildx.
-
-    Parameters:
-        - path: path to the Dockerfile.
-        - tag: imageId to include to Dockerhub.
-        - platform: architecture param in docker buildx.
-    """
-    os.environ["DOCKER_BUILDKIT"] = str(1)
-    docker_build_command = (
-        f"docker buildx build --platform {platform} --tag {tag} -f {path}/Dockerfile --rm=true "
-        f"--no-cache={True} --load {path}"
-    )
-    subprocess.check_output(docker_build_command, shell=True)  # security issue
-
-
-def publish_container_images(tags: Dict[str, str]):
-    """Publishes images to DockerHub.
-
-    Parameters:
-        - tags: dict of image_ids with role_name as key.
-    """
-    for tag in tags.values():
-        publish_image(tag)
-
-
-def publish_image(tag: str):
-    """Publishes image to DockerHub.
-
-    Parameters:
-        - tag: image_id.
-    """
-    os.environ["DOCKER_BUILDKIT"] = str(1)
-    docker_build_command = f"docker image push {tag}"
-    subprocess.check_output(docker_build_command, shell=True)
-
-
-def deploy_service(_args, build_path: str, platform: str, user: str):
-    """Deploys a service by building the container images and publishing the service.
-
-    Parameters:
-        - _args: deployment arguments
-        - build_path: path to the build folder
-        - platform: image architectures"""
-
+def deploy_service(_args, build_path: str, platform: str, user: str, skip_build: bool):
     with open(f"{build_path}/service_description.json") as f:
         service_definition = json.load(f)
 
-    role_definitions = service_definition["dockerRoleDefinitions"]
-    tags = {}
-    roles = []
-    for role in role_definitions:
-        role_name = role["id"]
-        roles.append(role_name)
-        role["imageId"] = user + "/" + role["imageId"]
-        tags[role_name] = role["imageId"]
+    images = []
+    for role in service_definition["dockerRoleDefinitions"]:
+        tag = user + "/" + role["imageId"]
+        id = role["id"]
+        path =  f"{build_path}/{id}"
+        image = Image(tag=tag, id=id, path=path)
+        images.append(image)
 
-    build_container_images(build_path, tags, roles, platform)
-    publish_container_images(tags)
+        # add the Dockerhub username to the service definition
+        role["imageId"] = tag
+
+    for context in service_definition["dockerContextDefinitions"]:
+        tag = user + "/" + context["imageId"]
+        id = context["id"]
+        path = f"{build_path}/context/{id}"
+        image = Image(tag=tag, id=id, path=path)
+        images.append(image)
+
+        # add the Dockerhub username to the service definition
+        context["imageId"] = tag
+
+    if not skip_build:
+        build_container_images(images, platform, _args.local_debug)
+        print("Built and published images")
+    else:
+        print("Skipped building images")
     publish_service_definition(_args, service_definition)
 
-
-def publish_service_definition(_args, service_definition: str):
+def publish_service_definition(_args, service_definition: Dict[str, Any]):
     """Publish service definition to zenoh, keyexpr: colmena_service_definitions
 
         Parameters:
             - _args: deployment arguments
             - service_definition: json service definition"""
-    print("publishing service definition to Zenoh")
-    zenoh_session = zenoh.open(zenoh.Config.from_file("zenoh_config.json5"))
-    zenoh_session.put("colmena_service_definitions", service_definition)
+    service_name = service_definition["id"]["value"]
+    print(f"publishing service definition for {service_name} to Zenoh")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    zenoh_config_path = os.path.join(script_dir, 'zenoh_config.json5')
+    zenoh_session = zenoh.open(zenoh.Config.from_file(zenoh_config_path))
+    zenoh_session.put(f"colmena_service_definitions/{service_name}", json.dumps(service_definition))
 
 if __name__ == "__main__":
     import argparse
@@ -130,6 +84,8 @@ if __name__ == "__main__":
     parser.add_argument("--host", help="Deployment host")
     parser.add_argument("--port", help="Deployment port")
     parser.add_argument("--user", required=True, help="DockerHub username")
+    parser.add_argument("--skip_build", action="store_true", help="Skip building Docker images")
+    parser.add_argument("--local_debug", action="store_true", help="Build and load image into local store")
     args = parser.parse_args()
 
-    deploy_service(args, args.build_path, args.platform, args.user)
+    deploy_service(args, args.build_path, args.platform, args.user, args.skip_build)
